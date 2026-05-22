@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini Bulk Chat Deleter
 // @namespace    http://tampermonkey.net/
-// @version      2025-11-27
+// @version      2026-05-23
 // @description  Bulk delete (mass-remove) chats from Gemini in batch. Select specific chats or delete all.
 // @author       Lorenzo Alali
 // @match        https://gemini.google.com/*
@@ -37,17 +37,17 @@
 (function () {
     'use strict';
 
-    // --- DOM Selectors (Updated 2025-11-27 for Gemini UI) ---
+// --- DOM Selectors (Updated for New Gemini UI) ---
     const SELECTORS = {
-        CHAT_CONTAINER: '.chat-history', // The scrollable container with chats
-        CHAT_ITEM: 'div[data-test-id="conversation"]', // Individual chat item
-        CHAT_TITLE: '.conversation-title',
-        PINNED_ICON: '.pin-icon-container mat-icon', // Check for pinned icon
-        MENU_BUTTON: 'button[data-test-id="actions-menu-button"]', // "More options" button
-        DELETE_MENU_ITEM: 'button[data-test-id="delete-button"], div[role="menu"] button:has(mat-icon[data-mat-icon-name="delete"])', // Delete menu option
-        CONFIRM_DIALOG: 'mat-dialog-container',
-        CONFIRM_BUTTON: 'button[data-test-id="confirm-button"]', // Confirmation button
-        CANCEL_BUTTON: 'button[data-test-id="cancel-button"]' // Cancel button
+        CHAT_CONTAINER: 'conversations-list mat-nav-list',
+        CHAT_ITEM: 'gem-nav-list-item[data-test-id="conversation"]',
+        CHAT_TITLE: '.title-text',
+        PINNED_ICON: 'mat-icon[data-mat-icon-name="push_pin"]',
+        MENU_BUTTON: 'button[data-test-id="actions-menu-button"]',
+        DELETE_MENU_ITEM: 'button[data-test-id="delete-button"]',
+        CONFIRM_DIALOG: 'mat-dialog-container, .mat-mdc-dialog-container',
+        CONFIRM_BUTTON: '[data-test-id="confirm-button"] button, button[data-test-id="confirm-button"]', // Tìm thẻ button nằm trong gem-button
+        CANCEL_BUTTON: '[data-test-id="cancel-button"] button, button[data-test-id="cancel-button"]'
     };
 
     // Trusted Types Policy for safe HTML insertion
@@ -152,9 +152,9 @@
             gap: 8px !important;
         }
         /* Ensure other children of the chat item don't shrink */
-        .gemini-bulk-delete-row > *:not(.bulk-delete-checkbox) {
+        .gemini-bulk-delete-row > a {
             flex: 1 !important;
-            min-width: 0 !important; /* Critical for text truncation in flex containers */
+            min-width: 0 !important;
         }
         
 
@@ -751,16 +751,15 @@
                         continue;
                     }
                 } else {
-                    // ALL Mode: Dynamic Query
-                    const historyContainer = document.querySelector('div.conversations-container');
+                    // ALL Mode: Dynamic Query (Update new DOM)
+                    const historyContainer = document.querySelector(SELECTORS.CHAT_CONTAINER);
                     if (!historyContainer) break;
 
-                    const chatItems = Array.from(historyContainer.querySelectorAll('.conversation-actions-container'));
+                    const chatItems = Array.from(historyContainer.querySelectorAll(SELECTORS.CHAT_ITEM));
                     if (chatItems.length === 0) break;
 
                     // Find first non-pinned
                     for (const item of chatItems) {
-                        const previousSibling = item.previousElementSibling;
                         const isPinned = item.querySelector(SELECTORS.PINNED_ICON);
                         if (!isPinned) {
                             targetItem = item;
@@ -782,10 +781,7 @@
 
                 // Find the menu button - it's in the next sibling (.conversation-actions-container)
                 // or within the parent element
-                let optionsButton = targetItem.nextElementSibling?.querySelector(SELECTORS.MENU_BUTTON);
-                if (!optionsButton) {
-                    optionsButton = targetItem.parentElement?.querySelector(SELECTORS.MENU_BUTTON);
-                }
+                let optionsButton = targetItem.querySelector(SELECTORS.MENU_BUTTON);
 
                 if (!optionsButton) {
                     GM_log("⚠️ Menu button not found for item, skipping.");
@@ -813,7 +809,7 @@
                 confirmBtn.click();
 
                 // Wait for response/animation
-                await sleep(1200);
+                await sleep(800);
 
                 successCount++;
                 processedCount++;
